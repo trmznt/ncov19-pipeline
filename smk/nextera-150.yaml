@@ -1,0 +1,16 @@
+remark: Nextera with 150-cycle sequencing kit in NextSeq
+
+# instrument, available options are: Miseq NextSeq550 NovaSeq
+instrument: NextSeq550
+
+# read length / cycle of sequencing kit: 75 100 150 250 300
+read_length: 150
+
+# libprep kit: Nextera Truseq
+libprep: Nextera
+
+# do not change below unless you know exactly what you are doing
+min_read_qual: 20
+min_depth: 1
+primer_trimmer: primal_remover
+
