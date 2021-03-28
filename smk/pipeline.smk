@@ -31,7 +31,7 @@ rule optical_dedup:
         dedup2 = temp("reads/dedup.R2.fastq.gz")
     log: "logs/optical_dedup.log"
     shell:
-        "{rootdir}/scripts/bbmap/clumpify.sh in={input.read1} in2={input.read2} out1={output.dedup1} out2={output.dedup2} dedupe optical spany adjacent 2> {log}"
+        "clumpify.sh in={input.read1} in2={input.read2} out1={output.dedup1} out2={output.dedup2} dedupe optical spany adjacent 2> {log}"
 
 
 rule adapter_trimming:
