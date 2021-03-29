@@ -18,6 +18,7 @@ rule all:
         "cons/blastn-consensus.txt",
         "maps/depth-counter.txt",
         "maps/trimmed-stats.txt.gz",
+        "maps/trimmed-depths.png",
         "cons/variants.tsv"
 
 
@@ -100,7 +101,7 @@ rule pair_filtering:
         temp("maps/unique_pairs.by-name.sam")
     log: "logs/unique_pairs.log"
     shell:
-        "(samtools sort -n -@16 {input} | {rootdir}/scripts/filter_uniquepair.py --min_match_len 23 --max_nm 0.29 --outstat maps/unique_pairs.txt -o {output} - ) && gzip maps/unique_pairs.txt"
+        "(samtools sort -n -@16 {input} | {rootdir}/scripts/filter_uniquepair.py --min_match_len 23 --max_nm 0.29 --outstat maps/unique_pairs.txt -o {output} - ) && gzip -f maps/unique_pairs.txt"
 
 
 if config['primer_trimmer'].lower() == 'primal_remover':
@@ -118,10 +119,12 @@ if config['primer_trimmer'].lower() == 'primal_remover':
         input:
             "maps/unique_pairs.by-name.bam"
         output:
-            temp("maps/primers_trimmed.sam")
+            trimmed = temp("maps/primers_trimmed.sam"),
+            split_1 = temp("maps/trimmed_split_1.sam"),
+            split_2 = temp("maps/trimmed_split_2.sam")
         log: "logs/primal_remover.log"
         shell:
-            "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {rootdir}/ref/nCoV-2019-pr.bed --logfile {log} -o {output} {input}"
+            "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {rootdir}/ref/nCoV-2019-pr.bed --logfile {log} --outsplit maps/trimmed_split -o {output.trimmed} {input}"
 
 
     rule trimmed_compressing:
@@ -131,6 +134,7 @@ if config['primer_trimmer'].lower() == 'primal_remover':
             "maps/primers_trimmed.bam"
         shell:
             "samtools fixmate -m {input} - | samtools sort -@16 -o {output} -"
+
 
 elif config['primer_trimmer'].lower() == 'ivar':
 
@@ -186,6 +190,40 @@ rule map_stat:
         "maps/trimmed-stats.txt.gz"
     shell:
         "samtools stats {input} | gzip > {output}"
+
+
+rule split_compressing:
+    input:
+        split_1 = "maps/trimmed_split_1.sam",
+        split_2 = "maps/trimmed_split_2.sam"
+    output:
+        out_1 = "maps/trimmed_split_1.bam",
+        out_2 = "maps/trimmed_split_2.bam"
+    shell:
+        "samtools fixmate -m {input.split_1} - | samtools sort -@16 -o {output.out_1} -; samtools fixmate -m {input.split_2} - | samtools sort -@16 -o {output.out_2} -;"
+
+
+rule depth_splits:
+    input:
+        map_1 = "maps/trimmed_split_1.bam",
+        map_2 = "maps/trimmed_split_2.bam"
+    output:
+        depth_1 = "maps/split-depths_1.txt.gz",
+        depth_2 = "maps/split-depths_2.txt.gz"
+    shell:
+        "samtools depth {input.map_1} | gzip > {output.depth_1}; samtools depth {input.map_2} | gzip > {output.depth_2}"
+
+
+rule plot_depths:
+    input:
+        depthfile_1 = "maps/split-depths_1.txt.gz",
+        depthfile_2 = "maps/split-depths_2.txt.gz",
+        statfile = "maps/trimmed-stats.txt.gz"
+    output:
+        plotfile = "maps/trimmed-depths.png",
+        gapfile = "maps/trimmed-gaps.txt"
+    shell:
+        "{rootdir}/scripts/depthplot.py -t {sample_id} -d 5 --statfile {input.statfile} --outgap {output.gapfile} -o {output.plotfile} {input.depthfile_1} {input.depthfile_2}"
 
 
 rule consensus:

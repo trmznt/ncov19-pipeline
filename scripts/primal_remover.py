@@ -314,7 +314,7 @@ def trim_ligation(read1, read2, primer_lookup, counter = {}):
         # a single amplicon set, otherwise primer mix has happened
         cerr('[possible mixup primers amplicons #%d <> #%d]' % (l_idx, r_idx))
 
-        return None
+        return None, -1
 
     (ls, le, rs, re, ampid) = lookup[l_idx]
 
@@ -331,12 +331,12 @@ def trim_ligation(read1, read2, primer_lookup, counter = {}):
         cerr('[WARN: reads too short for amplicon #%d: %s bp]' %
                 (l_idx, read2.reference_end-read1.reference_start))
 
-        return False
+        return False, -1
 
     softmask_primer(read1, le+1, False, False)
     softmask_primer(read2, rs-1, True, False)
 
-    return True
+    return True, l_idx
 
 
 def trim_tagmentation(read1, read2, primer_lookup, counter=None):
@@ -371,12 +371,12 @@ def trim_tagmentation(read1, read2, primer_lookup, counter=None):
     else:
         #print('== %d <> %d ==' % (read1.reference_start, read2.reference_end),
         #    lookup[possible_amplicons[0]])
-        return softmask(read1, read2, lookup[possible_amplicons[0]])
+        return softmask(read1, read2, lookup[possible_amplicons[0]]), possible_amplicons[0]
 
-    return None
+    return None, -1
 
 
-def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
+def trim_primers(segments, primer_lookup, outfile, trimmer_func=None, out_1=None, out_2=None):
 
     read_pairs = trimmed_pairs = untrimmed_pairs = invalid_pairs = indel_pairs = rf_pairs = unmapped_pairs = 0
     amplicon_counter = {}
@@ -422,7 +422,7 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
             cexit('ERR: found another invalid read pairs')
 
         try:
-            res = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
+            res, idx = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
         except BaseException as inst:
             raise inst
             print(inst)
@@ -441,6 +441,10 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
             raise RuntimeError('unknown trimmer_func() result')
         outfile.write(read1)
         outfile.write(read2)
+        if out_1 != None and out_2 != None:
+            out_split = out_2 if (idx % 2) == 0 else out_1
+            out_split.write(read1)
+            out_split.write(read2)
 
     print(amplicon_counter)
     return (read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter)
@@ -462,8 +466,14 @@ def primal_remover(args):
 
     outfile = pysam.AlignmentFile(args.outfile, 'wh', header=bam_header)
 
+    if args.outsplit:
+        out_1 = pysam.AlignmentFile(args.outsplit + '_1.sam', 'wh', header=bam_header)
+        out_2 = pysam.AlignmentFile(args.outsplit + '_2.sam', 'wh', header=bam_header)
+    else:
+        out_1 = out_2 = None
+
     read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter = trim_primers(
-                            segments, primer_lookup, outfile, trim_func)
+                            segments, primer_lookup, outfile, trim_func, out_1, out_2)
 
     segments.close()
     outfile.close()
@@ -499,6 +509,7 @@ def init_argparser(p=None):
     p.add_argument('--logfile', default='')
     p.add_argument('--outcount', default='')
     p.add_argument('--bedfile', required=True)
+    p.add_argument('--outsplit', default='')
     p.add_argument('infile')
 
     return p
