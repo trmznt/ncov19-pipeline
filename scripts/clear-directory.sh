@@ -1,5 +1,5 @@
 #!/usr/bin/sh
 
 rm -rf reads/trim*
-rm -rf maps cons
+rm -rf maps cons logs spades
 
