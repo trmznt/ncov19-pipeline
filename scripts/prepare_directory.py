@@ -6,6 +6,7 @@ import argparse, sys, os, subprocess
 
 def parse_args():
     parser = argparse.ArgumentParser(prog='prepare-directory.py')
+    parser.add_argument('-o', '--outdir', default='analysis')
     parser.add_argument('infiles', nargs='+')
     args = parser.parse_args()
     return args
@@ -27,11 +28,11 @@ def prep_directory(args):
             print('Error: unmatch pair [%s] - [%s]' % (prefix_1, prefix_2))
             sys.exit(1)
 
-        cmd1 = 'ln -sr %s analysis/%s/reads/raw.R1.fastq.gz' % (infile_1, prefix_1)
-        cmd2 = 'ln -sr %s analysis/%s/reads/raw.R2.fastq.gz' % (infile_2, prefix_2)
+        cmd1 = 'ln -sr %s %s/%s/reads/raw.R1.fastq.gz' % (infile_1, args.outdir, prefix_1)
+        cmd2 = 'ln -sr %s %s/%s/reads/raw.R2.fastq.gz' % (infile_2, args.outdir, prefix_2)
 
-        os.makedirs('analysis/%s/reads' % prefix_1)
-        os.makedirs('analysis/%s/sanger' % prefix_1)
+        os.makedirs('%s/%s/reads' % (args.outdir, prefix_1))
+        os.makedirs('%s/%s/sanger' % (args.outdir,prefix_1))
         print('Preparing for [%s]' % prefix_1)
         subprocess.run(cmd1, shell=True)
         subprocess.run(cmd2, shell=True)
