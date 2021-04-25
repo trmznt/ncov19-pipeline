@@ -142,7 +142,7 @@ class PrimerLookup(object):
     def find_right_index(self, segment):
         """ find the last index of amplicon that can contain the segment """
         keys = self.right_keys[segment.reference_name]
-        return bisect.bisect_right(keys, segment.reference_end)
+        return bisect.bisect_right(keys, segment.reference_end - 1)
 
 
 def softmask_primer(segment, primer_pos, end, debug):
@@ -303,6 +303,8 @@ def softmask(read1, read2, ampinfo):
 
 
 def trim_ligation(read1, read2, primer_lookup, counter = {}):
+    """ return False if no trimming, None if pairs are invalid, True if trimmed
+    """
 
     l_idx = primer_lookup.find_left_index(read1)
     r_idx = primer_lookup.find_right_index(read2)
@@ -312,9 +314,23 @@ def trim_ligation(read1, read2, primer_lookup, counter = {}):
     if l_idx != r_idx:
         # with adapter ligation, reads must be product of just
         # a single amplicon set, otherwise primer mix has happened
-        cerr('[possible mixup primers amplicons #%d <> #%d]' % (l_idx, r_idx))
+        # XXX: still need to check if we can include the reads
 
-        return None, -1
+        (ls1, le1, rs1, re1, ampid1) = lookup[l_idx]
+        (ls2, le2, rs2, re2, ampid2) = lookup[r_idx]
+        read1.set_tag('XP', -1)
+        read2.set_tag('XP', -1)
+        if read1.reference_start < le1 or read2.reference_end > rs2:
+            try:
+                softmask_primer(read1, le1, False, False)
+                softmask_primer(read2, rs2, True, False)
+            except Exception as err:
+                cerr('[discarding possible mixup primers amplicons #%d <> #%d]' % (l_idx+1, r_idx+1))
+                cerr('[ATT: %d %d %d %d]' % (read1.reference_start, read1.reference_end, read2.reference_start, read2.reference_end))
+                cerr( str(err) )
+                return None
+            return True
+        return False
 
     (ls, le, rs, re, ampid) = lookup[l_idx]
 
@@ -327,16 +343,19 @@ def trim_ligation(read1, read2, primer_lookup, counter = {}):
 
     if read1.reference_start > le or read2.reference_end < rs:
         # read1 and read2 do not start/end at primer binding site
-        # report as invalid amplicon
-        cerr('[WARN: reads too short for amplicon #%d: %s bp]' %
-                (l_idx, read2.reference_end-read1.reference_start))
+        #cerr('[WARN: reads too short for amplicon #%d: %s bp (expected: %d bp)]' %
+        #        (l_idx, read2.reference_end-read1.reference_start, re-ls))
+        read1.set_tag('XP', l_idx + 1)
+        read2.set_tag('XP', l_idx + 1)
 
-        return False, -1
+        return False
 
     softmask_primer(read1, le+1, False, False)
     softmask_primer(read2, rs-1, True, False)
+    read1.set_tag('XP', l_idx + 1)
+    read2.set_tag('XP', l_idx + 1)
 
-    return True, l_idx
+    return True
 
 
 def trim_tagmentation(read1, read2, primer_lookup, counter=None):
@@ -366,17 +385,22 @@ def trim_tagmentation(read1, read2, primer_lookup, counter=None):
     elif len(possible_amplicons) == 0:
         r_idx = min(len(lookup)-1, r_idx)
         #cerr('ERR: <%d, %d>' % (l_idx, r_idx))
-        print('ERR: spanning multi-amplicon %d <> %d :: [%s,%s]' %
-                (read1.reference_start, read2.reference_end, lookup[l_idx], lookup[r_idx]))
+        ls1, le1, rs1, re1, amp_id1 = lookup[l_idx]
+        ls2, le2, rs2, re2, amp_id2 = lookup[r_idx]
+        read1.set_tag('XP', -1)
+        read2.set_tag('XP', -1)
+        return softmask(read1, read2, (ls1, le1, rs2, re2, -1))
     else:
         #print('== %d <> %d ==' % (read1.reference_start, read2.reference_end),
         #    lookup[possible_amplicons[0]])
-        return softmask(read1, read2, lookup[possible_amplicons[0]]), possible_amplicons[0]
+        read1.set_tag('XP', possible_amplicons[0] + 1)
+        read2.set_tag('XP', possible_amplicons[0] + 1)
+        return softmask(read1, read2, lookup[possible_amplicons[0]])
 
-    return None, -1
+    return None
 
 
-def trim_primers(segments, primer_lookup, outfile, trimmer_func=None, out_1=None, out_2=None):
+def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
 
     read_pairs = trimmed_pairs = untrimmed_pairs = invalid_pairs = indel_pairs = rf_pairs = unmapped_pairs = 0
     amplicon_counter = {}
@@ -405,12 +429,13 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None, out_1=None
             rf_pairs += 1
             continue
 
-        if False and read1.reference_end > read2.reference_end:
+        if read1.reference_end > read2.reference_end:
 
             # read1 passes read2.end, just softmask read1
             # if cigar is complicated, just remove this read pair
             if len(read1.cigar) > 1 or read1.cigar[0][0] != 0:
                 cerr("ERR: complicated cigar: %s" % read1.cigarstring)
+                cerr('[ATT: %d %d %d %d]' % (read1.reference_start, read1.reference_end, read2.reference_start, read2.reference_end))
                 invalid_pairs += 1
                 continue
 
@@ -418,11 +443,22 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None, out_1=None
             trim_size = read1.reference_end - read2.reference_end
             read1.cigar = [ (0, read1.cigar[0][1] - trim_size), (4, trim_size)]
 
-        if False and read1.reference_start > read2.reference_start:
-            cexit('ERR: found another invalid read pairs')
+        if read1.reference_start > read2.reference_start:
+
+            # read2 passes read1.reference_start, just softmask read2
+            # only modify cigar if the last cigar is either M or S
+            if len(read2.cigar) > 1 or read2.cigar[0][0] != 0:
+                cexit("ERR: complicated cigar: %s" % read2.cigarstring)
+                cerr('[ATT: %d %d %d %d]' % (read1.reference_start, read1.reference_end, read2.reference_start, read2.reference_end))
+                invalid_pairs += 1
+                continue
+
+            # modify cigar
+            trim_size = read1.reference_start - read2.reference_start
+            read2.cigar = [ (4, trim_size), (0, read2.cigar[0][1] - trim_size) ]
 
         try:
-            res, idx = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
+            res = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
         except BaseException as inst:
             raise inst
             print(inst)
@@ -441,10 +477,6 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None, out_1=None
             raise RuntimeError('unknown trimmer_func() result')
         outfile.write(read1)
         outfile.write(read2)
-        if out_1 != None and out_2 != None:
-            out_split = out_2 if (idx % 2) == 0 else out_1
-            out_split.write(read1)
-            out_split.write(read2)
 
     print(amplicon_counter)
     return (read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter)
@@ -466,14 +498,8 @@ def primal_remover(args):
 
     outfile = pysam.AlignmentFile(args.outfile, 'wh', header=bam_header)
 
-    if args.outsplit:
-        out_1 = pysam.AlignmentFile(args.outsplit + '_1.sam', 'wh', header=bam_header)
-        out_2 = pysam.AlignmentFile(args.outsplit + '_2.sam', 'wh', header=bam_header)
-    else:
-        out_1 = out_2 = None
-
     read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter = trim_primers(
-                            segments, primer_lookup, outfile, trim_func, out_1, out_2)
+                            segments, primer_lookup, outfile, trim_func)
 
     segments.close()
     outfile.close()
@@ -509,7 +535,6 @@ def init_argparser(p=None):
     p.add_argument('--logfile', default='')
     p.add_argument('--outcount', default='')
     p.add_argument('--bedfile', required=True)
-    p.add_argument('--outsplit', default='')
     p.add_argument('infile')
 
     return p
