@@ -6,7 +6,7 @@ import argparse, sys, os, subprocess
 
 def parse_args():
     parser = argparse.ArgumentParser(prog='prepare-directory.py')
-    parser.add_argument('-o', '--outdir', default='analysis')
+    parser.add_argument('-o', '--outdir', default='samples')
     parser.add_argument('infiles', nargs='+')
     args = parser.parse_args()
     return args
@@ -20,6 +20,8 @@ def prep_directory(args):
 
     infiles = sorted(args.infiles)
     infiles_1, infiles_2 = infiles[::2], infiles[1::2]
+
+    counter = 0
 
     for (infile_1, infile_2) in zip(infiles_1, infiles_2):
         prefix_1 = os.path.basename(infile_1).split('_', 1)[0]
@@ -36,6 +38,9 @@ def prep_directory(args):
         print('Preparing for [%s]' % prefix_1)
         subprocess.run(cmd1, shell=True)
         subprocess.run(cmd2, shell=True)
+        counter += 1
+
+    print("Preparing directories for %d samples." % counter)
         
 
 def main():
