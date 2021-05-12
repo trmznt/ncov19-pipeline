@@ -35,7 +35,11 @@ def gather_consensus( args ):
         cons.extend( seqs )
 
     for indir in args.indirs:
-        seqs = load(indir + args.infile)
+        try:
+            seqs = load(indir + args.infile)
+        except FileNotFoundError:
+            cerr('[WARN: no such file: %s]' % (indir + args.infile) )
+            continue
 
         cons.append( biosequence(indir, seqs[0].seq))
 
