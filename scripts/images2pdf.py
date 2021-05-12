@@ -22,6 +22,7 @@ def batch(seq, size):
 def images2pdf( args ):
 
     pages = []
+    counter = 0
     for file_list in batch(args.infiles, args.n):
 
         imgs = [ Image.open(infile) for infile in file_list ]
@@ -38,8 +39,10 @@ def images2pdf( args ):
             y_offset += img.height
 
         pages.append( dest )
+        counter += len(imgs)
 
     pages[0].save(args.outfile, format='PDF', save_all=True, append_images = pages[1:])
+    print('Processing depthplot for %d samples' % counter)
 
 
 def main():
