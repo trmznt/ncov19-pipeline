@@ -21,6 +21,7 @@ def prepare_submission(args):
     # make sure sequence name is a string (in case the the column is automatically
     # converted to number)
     metadata_df['fn'] = metadata_df['fn'].astype('str')
+    metadata_df['covv_assembly_method'] = metadata_df['covv_assembly_method'].astype('str')
 
     # open depth file
     depth_df = pd.read_table(args.depths, sep='\t', header=None)
@@ -40,7 +41,7 @@ def prepare_submission(args):
     #import IPython; IPython.embed()
     for (i, r) in metadata_df.iterrows():
 
-        if i == 0: continue
+        #if i == 0: continue
 
         seq_name = r['fn']
         if seq_name not in mseq_keys:
