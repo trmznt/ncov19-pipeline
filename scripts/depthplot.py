@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import argparse, sys, gzip
+import argparse
+import sys
+import itertools
 
 try:
     from matplotlib import pyplot as plt
@@ -9,28 +11,26 @@ except:
     sys.exit(1)
 
 import numpy as np
+import pysam
+import yaml
+
+MAX_INSERT = 5000
 
 def init_argparser():
     p = argparse.ArgumentParser("Create depth plot")
     p.add_argument('-t', '--title', default='depth')
     p.add_argument('-d', '--mindepth', type=int, default=3)
+    p.add_argument('--maxinsert', type=int, default=MAX_INSERT)
+    p.add_argument('--stat_insert', default=False, action='store_true')
+    p.add_argument('--log_insert', default=False, action='store_true')
+    p.add_argument('--pool', type=int, default=-1)
     p.add_argument('--outgap', default='')
-    p.add_argument('--statfile', default='')
+    p.add_argument('--outdepth', default='')
     p.add_argument('-o', '--outfile', default='outplot.png')
 
-    p.add_argument('infiles', nargs='+')
+    p.add_argument('infile')
 
     return p
-
-def main( args ):
-
-    depthplot( args )
-
-
-import itertools
-import yaml
-
-colors = itertools.cycle(['forestgreen', 'royalblue', 'lightcoral'])
 
 
 def ranges(i):
@@ -41,76 +41,119 @@ def ranges(i):
 
 def depthplot( args ):
 
-
-    if args.statfile:
+    if args.stat_insert:
         fig, axs = plt.subplots(1, 2, figsize=(30,5),
                 gridspec_kw={'width_ratios': [5, 1]})
         ax = axs[0]
     else:
         fig, ax = plt.subplots(figsize=(25,5))
 
+    segments = pysam.AlignmentFile(args.infile, 'rb')
+    length = segments.lengths[0]
+    print('Reference length: %d' % length)
 
-    for depthfile in args.infiles:
+    # variables
+    depths = ( np.zeros(length), np.zeros(length), np.zeros(length) )
+    missing_regions = ( [], [], [] )
+    inserts = ( np.zeros(args.maxinsert), np.zeros(args.maxinsert), np.zeros(args.maxinsert))
+    max_insert = 0
+    start_reads = {}
+
+    # calculate depths and insert sizes
+    for read in segments:
+        try:
+            amp_id = read.get_tag('XP')
+            if amp_id < 0:
+                pool = 2
+            else:
+                pool = amp_id % 2
+        except KeyError:
+            pool = 2
+        depths[pool][read.reference_start : read.reference_end] += 1
+        if read.query_name in start_reads:
+            if read.is_reverse:
+                insert_size = read.reference_end - start_reads[read.query_name]
+            else:
+                insert_size = start_reads[read.query_name] - read.reference_start
+            del start_reads[read.query_name]
+            if 0 < insert_size < args.maxinsert:
+                max_insert = max(max_insert, insert_size)
+                inserts[pool][insert_size] += 1
+            else:
+                print('WARN: impossible insert size of %d' % insert_size)
+        else:
+            if read.is_reverse:
+                start_reads[read.query_name] = read.reference_end
+            else:
+                start_reads[read.query_name] = read.reference_start
+
+    if args.pool >= 0:
+        analyzed_depths = [ depths[args.pool] ]
+    else:
+        analyzed_depths = depths
+
+    colors = itertools.cycle(['forestgreen', 'royalblue', 'lightcoral'])
+    for y in analyzed_depths:
 
         color = next(colors)
-
-        # read data
-        depth_list = []
-        with gzip.open(depthfile, 'rt') as fin:
-            for line in fin:
-                tokens = line.split()
-                depth_list.append( (int(tokens[1]), int(tokens[2])) )
-
-        # plot data
-        length = depth_list[-1][0] + 1
-        x = np.arange(length)
-        y = np.zeros(length)
-
-        for (pos, depth) in depth_list:
-            y[pos] = depth
-
-        # check for holes (depth < 1):
-        holes = []
-        for i in range(length):
-            if y[i] < args.mindepth:
-                holes.append(i)
-
-        print('Missing region(s):')
-        regions = []
-        for region in list(ranges(holes)):
-            regions.append(list(region))
-            print(region)
-        if args.outgap:
-            yaml.dump({args.title: regions}, open(args.outgap, 'w'))
-
+        x = np.arange(len(y))
         ax.fill_between(x, y, facecolor=color, color=color, alpha=0.5)
 
     ax.set_yscale("log", base=10)
     ax.set_ylim(ymin=0.7)
     ax.set_title(args.title)
 
-    if args.statfile:
+    # check gaps
+    y = sum(analyzed_depths)
 
-        # read data
-        insert_size = []
-        insert_count = []
-        with gzip.open(args.statfile, 'rt') as fin:
-            for line in fin:
-                if not line.startswith('IS'):
-                    continue
-                tokens = line.split()
-                insert_size.append( int(tokens[1]) )
-                insert_count.append( int(tokens[3]) )
+    # check for holes (depth < 1):
+    holes = []
+    for i in range(len(y)):
+        if y[i] < args.mindepth:
+            holes.append(i)
 
-        # plot data
-        axs[1].hist(insert_size, len(insert_size), weights=insert_count, color='plum')
-        axs[1].set_yscale("log", base=10)
+    print('Missing region(s):')
+    regions = []
+    for region in list(ranges(holes)):
+        regions.append(list(region))
+        print(region)
+    if args.outgap:
+        yaml.dump({args.title: regions}, open(args.outgap, 'w'))
+
+    # calculate average depths
+    if args.outdepth:
+        y = y[ y > args.mindepth ]
+        depth = y.mean() if len(y) > 0 else 0
+        with open(args.outdepth, 'w') as fout:
+            fout.write('SAMPLE\tDEPTH\tBASES\n')
+            fout.write('%s\t%d\t%d\n' % (args.title, int(depth), len(y)) )
+
+    if args.stat_insert:
+
+        colors = itertools.cycle(['forestgreen', 'royalblue', 'lightcoral'])
+        if args.pool >= 0:
+            analyzed_inserts = [ inserts[args.pool] ]
+        else:
+            analyzed_inserts = inserts
+
+        for insert_count in analyzed_inserts:
+
+            insert_count = insert_count[:max_insert]
+            insert_size = np.arange(max_insert)
+
+            # plot data
+            axs[1].hist(insert_size, len(insert_size), weights=insert_count, color=next(colors), alpha=0.5)
+            if args.log_insert:
+                axs[1].set_yscale("log", base=10)
+            axs[1].set_title('Insert Size')
 
     fig.tight_layout()
     fig.savefig(args.outfile)
 
+
 def main():
     depthplot( init_argparser().parse_args() )
+
 
 if __name__ == '__main__':
     main()
