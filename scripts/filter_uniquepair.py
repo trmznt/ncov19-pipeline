@@ -4,15 +4,17 @@ import argparse
 import pysam
 import bisect
 import sys
+import gzip
 
 def filter_unique_pair(infile, outfile, refname, min_match_len, max_nm, outstat):
 
-    inbam = pysam.AlignmentFile(infile, 'rb')
+    inbam = pysam.AlignmentFile(infile, 'r')
     bam_header = inbam.header.copy().to_dict()
 
-    outbam = pysam.AlignmentFile(outfile, 'wh', header=bam_header)
+    mode = 'wh' if outfile == '-' else 'wb'
+    outbam = pysam.AlignmentFile(outfile, mode, header=bam_header)
 
-    statf = open(outstat, 'w') if outstat else None
+    statf = gzip.open(outstat, 'wt') if outstat else None
 
     current_query_name = None
     current_reads = []
@@ -54,6 +56,8 @@ def check_and_write(reads, outbam, min_match_len, max_nm, statf):
 
     read1 = reads[0]
     read2 = reads[1]
+    if not (read1.is_proper_pair and read2.is_proper_pair):
+        return 0
     if read1.is_reverse:
         read1, read2 = read2, read1
     if (read1.reference_end - read1.reference_start) < min_match_len:
@@ -93,8 +97,8 @@ def main():
     args = init_argparser().parse_args()
 
     uniqpair, total_read = filter_unique_pair(args.infile, args.outfile, args.refname, args.min_match_len, args.max_nm, args.outstat)
-    print('Found %d unique pairs (%d reads) out of %d reads (%f%%)' %
-        (uniqpair, uniqpair*2, total_read, uniqpair*2/total_read*100))
+    sys.stderr.write('Reads in: %d\nReads out: %d\nUnique pairs: %d\nPercentage: %d\n' % (total_read, uniqpair*2, uniqpair, uniqpair*2/total_read*100))
+#        (uniqpair, uniqpair*2, total_read, uniqpair*2/total_read*100))
 
 if __name__ == '__main__':
 
