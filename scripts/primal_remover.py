@@ -379,9 +379,9 @@ def trim_tagmentation(read1, read2, primer_lookup, counter=None):
 
     if len(possible_amplicons) > 1:
         # we have more than 1 amplicon that can yield this pair
-        print('WARN: %d <> %d' % (read1.reference_start, read2.reference_end))
+        cerr('WARN: %d <> %d' % (read1.reference_start, read2.reference_end))
         for idx in possible_amplicons:
-            print('>>', lookup[idx])
+            cerr('>> ' + str (lookup[idx]))
     elif len(possible_amplicons) == 0:
         r_idx = min(len(lookup)-1, r_idx)
         #cerr('ERR: <%d, %d>' % (l_idx, r_idx))
@@ -461,7 +461,6 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
             res = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
         except BaseException as inst:
             raise inst
-            print(inst)
             indel_pairs += 1
             continue
         if res is True:
@@ -478,7 +477,7 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
         outfile.write(read1)
         outfile.write(read2)
 
-    print(amplicon_counter)
+    #print(amplicon_counter)
     return (read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter)
 
 
@@ -496,7 +495,8 @@ def primal_remover(args):
     else:
         cexit('[ERR: unknown trimming method: %s' % args.method)
 
-    outfile = pysam.AlignmentFile(args.outfile, 'wh', header=bam_header)
+    mode = 'wh' if args.outfile == '-' else 'wb'
+    outfile = pysam.AlignmentFile(args.outfile, mode, header=bam_header)
 
     read_pairs, trimmed_pairs, untrimmed_pairs, invalid_pairs, rf_pairs, indel_pairs, unmapped_pairs, amplicon_counter = trim_primers(
                             segments, primer_lookup, outfile, trim_func)
@@ -504,7 +504,7 @@ def primal_remover(args):
     segments.close()
     outfile.close()
 
-    print(amplicon_counter)
+    #print(amplicon_counter)
     if args.outcount and amplicon_counter:
         with open(args.outcount, 'w') as countfile:
             for k, v in amplicon_counter.items():
