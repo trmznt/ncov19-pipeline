@@ -24,7 +24,8 @@ rule all:
         "maps/trimmed-depths.png",
         "cons/blastn-consensus.txt",
         "cons/consensus.fa",
-        "cons/variants.tsv"
+        "cons/variants.tsv",
+        "logs/stats.tsv",
 
 
 rule mapping:
@@ -158,4 +159,13 @@ else:
     raise RuntimeError('ERR: primer_trimmer is not defined!')
 
 
+rule stats:
+    input:
+        "maps/depth-counter.txt",
+        "cons/consensus.fa",
+        "cons/variants.tsv"
+    output:
+        "logs/stats.tsv"
+    shell:
+        "{rootdir}/scripts/collect_stats.py {sample_id} > {output}"
 
