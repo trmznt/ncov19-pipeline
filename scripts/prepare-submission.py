@@ -22,44 +22,44 @@ def prepare_submission(args):
     # converted to number)
     metadata_df['fn'] = metadata_df['fn'].astype('str')
     metadata_df['covv_assembly_method'] = metadata_df['covv_assembly_method'].astype('str')
+    metadata_df.set_index('fn', drop=False, inplace=True )
 
-    # open depth file
-    depth_df = pd.read_table(args.depths, sep='\t', header=None)
+    #import IPython; IPython.embed()
 
-    # change the first column to string
-    depth_df[0] = depth_df[0].astype('str')
-    depth_df.set_index(0, inplace=True)
+    # open infile tsv
+    submission_df = pd.read_table(args.infile, sep='\t')
+    submission_df['SAMPLE'] = submission_df['SAMPLE'].astype('str')
 
     # open sequence file
-    mseq= bioio.load( args.infile )
+    mseq = bioio.load( args.seqfile )
     mseq_keys = {}
     for i in range(len(mseq)):
         mseq_keys[ mseq[i].label ] = i
 
-    # iterate over metadata rows
-    unused = []
+    # iterate over submission_df
+    used = []
     #import IPython; IPython.embed()
-    for (i, r) in metadata_df.iterrows():
+    for (i, s) in submission_df.iterrows():
 
-        #if i == 0: continue
+        sample_id = s['SAMPLE']
+        r = metadata_df.loc[sample_id]
 
-        seq_name = r['fn']
-        if seq_name not in mseq_keys:
-            unused.append( i )
+        if sample_id not in mseq_keys:
             continue
 
         # set coverage
         # import IPython; IPython.embed()
-        metadata_df.at[i, 'covv_coverage'] = depth_df.loc[seq_name, 1]
-        metadata_df.at[i, 'fn'] = out_fasta
-        metadata_df.at[i, 'covv_assembly_method'] = 'custom minimap2 + iVar pipeline'
+        metadata_df.at[sample_id, 'covv_coverage'] = s['AVGDEPTH']
+        metadata_df.at[sample_id, 'fn'] = out_fasta
+        metadata_df.at[sample_id, 'covv_assembly_method'] = args.covv_assembly_method
 
         # set sequence name
-        idx = mseq_keys[seq_name]
+        idx = mseq_keys[sample_id]
         mseq[idx].label = r['covv_virus_name']
+        used.append(sample_id)
 
     # remove unused metadata
-    metadata_df.drop( unused, inplace=True )
+    metadata_df = metadata_df.loc[ used ]
 
     # write to new fasta & metadata file
     metadata_df.to_csv(out_metadata, sep=',', index=False)
@@ -70,8 +70,9 @@ def init_argparser():
 
     p = arg_parser('prepare GISAID submission files')
 
+    p.add_argument('--covv_assembly_method', default='custom minimap2 + iVar pipeline')
     p.add_argument('--metafile', required=True)
-    p.add_argument('--depths', required=True)
+    p.add_argument('--seqfile', required=True)
     p.add_argument('--outprefix', required=True)
     p.add_argument('infile')
 
