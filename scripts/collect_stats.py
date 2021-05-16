@@ -112,8 +112,19 @@ def main():
     initial_reads, optical_dedup_reads = parse_optical_dedup()
     adapter_trimmed_reads = parse_adapter_trimming()
     properly_mapped_reads = parse_unique_pairs()
-    pcr_dedup_reads = parse_markdup()
-    primer_trimmed_reads = parse_primal_remover()
+
+    try:
+        pcr_dedup_reads = parse_markdup()
+    except:
+        # pcr dedup is not performed
+        pcr_dedup_reads = properly_mapped_reads
+
+    try:
+        primer_trimmed_reads = parse_primal_remover()
+    except FileNotFoundError:
+        # primer trimming is not performed
+        primer_trimmed_reads = pcr_dedup_reads
+
     depth, bases = parse_depth_counter()
     seqlength, n_bases = parse_consensus_fasta()
     point_mutations, inframe_gaps, ooframe_gaps = parse_variants()
