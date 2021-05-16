@@ -10,7 +10,8 @@ refseq = rootdir + "/ref/nc_045512.fasta"
 refmap = rootdir + "/ref/nc_045512.mmi"
 gff = rootdir + "/ref/NC_045512.2.sorted.gff3"
 sample_id = os.path.basename( os.getcwd() )
-mode = 'tagment' if config['libprep'].lower() in ['nextera', 'ultraiifs', 'dnaprep'] else 'ligate'
+mode = 'tagment' if config['libprep'].lower() in ['nextera', 'ultraiifs', 'dnaprep', 'truseqstranded'] else 'ligate'
+
 min_depth = config['min_depth']
 
 include: "trim_reads.smk"
@@ -92,13 +93,24 @@ elif mode == 'ligate':
         output:
             temp("maps/unique_pairs.by-name.bam")
         shell:
-            "ln -s {input} {output}"
+            "ln -sf mapped.bam {output}"
 
 else:
     raise RuntimeError("ERR: mode %s is unknown" % mode)
 
 
-if config['primer_trimmer'].lower() == 'primal_remover':
+if config['primer_trimmer'] is None:
+
+    rule sort_mapped_reads:
+        input:
+            "maps/unique_pairs.by-name.bam"
+        output:
+            "maps/primers_trimmed.bam"
+        shell:
+            "samtools fixmate -m {input} - | samtools sort -@8 -o {output} -"
+
+
+elif config['primer_trimmer'].lower() == 'primal_remover':
 
 #    rule pair_compressing:
 #        input:
@@ -113,7 +125,7 @@ if config['primer_trimmer'].lower() == 'primal_remover':
         input:
             "maps/unique_pairs.by-name.bam"
         output:
-            temp("maps/primers_trimmed.bam"),
+            "maps/primers_trimmed.bam",
         log: "logs/primal_remover.log"
         shell:
             "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {rootdir}/ref/nCoV-2019-pr.bed --logfile {log}  -o - {input}"
