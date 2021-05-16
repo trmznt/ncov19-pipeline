@@ -6,7 +6,7 @@ instrument: MiSeq
 # read length / cycle of sequencing kit: 75 100 150 250 300
 read_length: 150
 
-# libprep kit: Nextera Truseq UltraIIFS UltraII DNAPrep
+# libprep kit: Nextera Truseq UltraIIFS UltraII DNAPrep TruseqStranded
 libprep: Nextera
 
 # do not change below unless you know exactly what you are doing
@@ -14,5 +14,7 @@ minlen: 35
 maxlen: 0
 min_read_qual: 20
 min_depth: 10
+
+# primer trimmer software: primal_remover ivar null
 primer_trimmer: primal_remover
 
