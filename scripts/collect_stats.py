@@ -92,6 +92,7 @@ def parse_variants():
         key = (tokens[0], tokens[1])
         if key in snvs:
             continue
+        snvs[key] = tokens
         if len(tokens[2]) == 1 and len(tokens[3]) == 1:
             point_muts += 1
             continue
