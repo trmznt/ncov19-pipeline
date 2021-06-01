@@ -20,11 +20,11 @@ include: "consensus.smk"
 
 rule all:
     input:
-        "maps/primers_trimmed.bam",
+        "maps/consensus.bam",
         "maps/depth-counter.txt",
-        "maps/trimmed-depths.png",
+        "maps/consensus-depths.png",
         "cons/blastn-consensus.txt",
-        "cons/consensus.fa",
+        "cons/consensus.fas",
         "cons/variants.tsv",
         "logs/stats.tsv",
 
@@ -105,7 +105,7 @@ if config['primer_trimmer'] is None:
         input:
             "maps/unique_pairs.by-name.bam"
         output:
-            "maps/primers_trimmed.bam"
+            "maps/consensus.bam"
         shell:
             "samtools fixmate -m {input} - | samtools sort -@8 -o {output} -"
 
@@ -125,7 +125,7 @@ elif config['primer_trimmer'].lower() == 'primal_remover':
         input:
             "maps/unique_pairs.by-name.bam"
         output:
-            "maps/primers_trimmed.bam",
+            "maps/consensus.bam",
         log: "logs/primal_remover.log"
         shell:
             "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {rootdir}/ref/nCoV-2019-pr.bed --logfile {log}  -o - {input}"
@@ -163,7 +163,7 @@ elif config['primer_trimmer'].lower() == 'ivar':
         input:
             "maps/primers_trimmed-unsorted.bam"
         output:
-            "maps/primers_trimmed.bam"
+            "maps/consensus.bam"
         shell:
             "samtools sort -@16 -o {output} {input}"
 
@@ -174,7 +174,7 @@ else:
 rule stats:
     input:
         "maps/depth-counter.txt",
-        "cons/consensus.fa",
+        "cons/consensus.fas",
         "cons/variants.tsv"
     output:
         "logs/stats.tsv"
