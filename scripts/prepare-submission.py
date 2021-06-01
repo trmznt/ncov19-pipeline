@@ -16,6 +16,7 @@ def prepare_submission(args):
         separator = ','
     elif args.metafile.lowe().endswith('.tsv'):
         separator = '\t'
+    cerr(f'[Reading metadata file {args.metafile}]')
     metadata_df = pd.read_table(args.metafile, sep=separator)
 
     # make sure sequence name is a string (in case the the column is automatically
@@ -56,6 +57,7 @@ def prepare_submission(args):
         # set sequence name
         idx = mseq_keys[sample_id]
         mseq[idx].label = r['covv_virus_name']
+        mseq[idx].seq = mseq[idx].seq.strip(b'-')
         used.append(sample_id)
 
     # remove unused metadata
