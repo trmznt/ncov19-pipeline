@@ -57,13 +57,14 @@ def parse_primal_remover():
 def parse_depth_counter():
 
     lines = open('maps/depth-counter.txt').read().split('\n')
-    tokens = lines[1].split()
-    depth, bases = int(tokens[1]), int(tokens[2])
-    return depth, bases
+    t = lines[1].split()
+    depth, bases = int(t[1]), int(t[2]),
+    mean_is, med_is, sd_is = round(float(t[3])), round(float(t[4])), round(float(t[5]))
+    return depth, bases, mean_is, med_is, sd_is
 
 def parse_consensus_fasta():
 
-    lines = open('cons/consensus.fa').read().split('\n')
+    lines = open('cons/consensus.fas').read().split('\n')
     sequence = ''
     label = None
     for line in lines:
@@ -85,6 +86,7 @@ def parse_variants():
     point_muts = 0
     inframe_gaps = 0
     ooframe_gaps = 0
+
     for line in lines[1:]:
         tokens = line.split('\t')
         if len(tokens) < 4:
@@ -126,7 +128,7 @@ def main():
         # primer trimming is not performed
         primer_trimmed_reads = pcr_dedup_reads
 
-    depth, bases = parse_depth_counter()
+    depth, bases, mean_is, med_is, sd_is = parse_depth_counter()
     seqlength, n_bases = parse_consensus_fasta()
     point_mutations, inframe_gaps, ooframe_gaps = parse_variants()
 
@@ -137,7 +139,8 @@ def main():
     outfile = sys.stdout
     headers = [ 'SAMPLE', 'RAW', 'OP_DEDUP', 'OP_DEDUP_R', 'ADAPTER', 'ADAPTER_R',
                 'PROP_PAIR', 'PROP_PAIR_R', 'PCR_DEDUP', 'PCR_DEDUP_R', 'PRIMAL', 'PRIMAL_R',
-                'AVGDEPTH', 'BASE', 'LENGTH', 'N_BASE', 'POINTMUT', 'INFRAME', 'OOFRAME' ]
+                'MEAN_IS', 'MED_IS', 'SD_IS', 'AVGDEPTH', 'BASE', 'LENGTH', 'N_BASE',
+                'POINTMUT', 'INFRAME', 'OOFRAME' ]
     outfile.write('%s\n' % '\t'.join( headers ))
     outfile.write(  f'{sample_code}\t'
                     f'{initial_reads}\t'
@@ -146,6 +149,7 @@ def main():
                     f'{properly_mapped_reads}\t{properly_mapped_reads/initial_reads:5.3f}\t'
                     f'{pcr_dedup_reads}\t{pcr_dedup_reads/initial_reads:5.3f}\t'
                     f'{primer_trimmed_reads}\t{primer_trimmed_reads/initial_reads:5.3f}\t'
+                    f'{mean_is}\t{med_is}\t{sd_is}\t'
                     f'{depth}\t{bases}\t{seqlength}\t{n_bases}\t'
                     f'{point_mutations}\t{inframe_gaps}\t{ooframe_gaps}\n'
     )
