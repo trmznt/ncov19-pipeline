@@ -16,7 +16,7 @@ def init_argparser(p=None):
 
     p.add_argument('--add', default=None)
     p.add_argument('-o', '--outdir', default='')
-    p.add_argument('-c', '--consfile', default='cons/consensus.fa')
+    p.add_argument('-c', '--consfile', default='cons/consensus.fas')
     p.add_argument('-s', '--statfile', default='logs/stats.tsv')
     p.add_argument('indir')
 
@@ -51,7 +51,7 @@ def gather_consensus( args ):
             cerr('[WARN: no such file: %s]' % (seqpath) )
             continue
 
-        cons.append( biosequence(indir, seqs[0].seq))
+        cons.append( seqs[0] )
 
         statpath = os.path.join(args.indir, indir, args.statfile)
         with open(statpath) as fin:
