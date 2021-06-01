@@ -87,6 +87,12 @@ def depthplot( args ):
             else:
                 start_reads[read.query_name] = read.reference_start
 
+    all_inserts = sum(inserts)
+    for max_insert_threshold in range(max_insert, 0, -1):
+        if all_inserts[max_insert_threshold] > 1:
+            break
+    max_insert = max_insert_threshold
+
     if args.pool >= 0:
         analyzed_depths = [ depths[args.pool] ]
     else:
@@ -120,14 +126,7 @@ def depthplot( args ):
     if args.outgap:
         yaml.dump({args.title: regions}, open(args.outgap, 'w'))
 
-    # calculate average depths
-    if args.outdepth:
-        y = y[ y > args.mindepth ]
-        depth = y.mean() if len(y) > 0 else 0
-        with open(args.outdepth, 'w') as fout:
-            fout.write('SAMPLE\tDEPTH\tBASES\n')
-            fout.write('%s\t%d\t%d\n' % (args.title, int(depth), len(y)) )
-
+    insert_sizes = np.arange(max_insert)
     if args.stat_insert:
 
         colors = itertools.cycle(['forestgreen', 'royalblue', 'lightcoral'])
@@ -139,16 +138,30 @@ def depthplot( args ):
         for insert_count in analyzed_inserts:
 
             insert_count = insert_count[:max_insert]
-            insert_size = np.arange(max_insert)
 
             # plot data
-            axs[1].hist(insert_size, len(insert_size), weights=insert_count, color=next(colors), alpha=0.5)
+            axs[1].hist(insert_sizes, len(insert_sizes), weights=insert_count, color=next(colors), alpha=0.5)
             if args.log_insert:
                 axs[1].set_yscale("log", base=10)
             axs[1].set_title('Insert Size')
 
     fig.tight_layout()
     fig.savefig(args.outfile)
+
+    # calculate average depths
+    if args.outdepth:
+        y = y[ y > args.mindepth ]
+        depth = y.mean() if len(y) > 0 else 0
+        inserts_freqs = sum( inserts )[:len(insert_sizes)]
+        mean_insize = np.average(insert_sizes, weights = inserts_freqs)
+        cdf = np.cumsum(inserts_freqs[insert_sizes])
+        med_insize = np.searchsorted(cdf, cdf[-1] // 2)
+        dev = inserts_freqs * (insert_sizes - mean_insize) ** 2
+        stddev = np.sqrt( dev.sum() / (inserts_freqs.sum() - 1) )
+        with open(args.outdepth, 'w') as fout:
+            fout.write('SAMPLE\tDEPTH\tBASES\tMEAN_IS\tMED_IS\tSD_IS\n')
+            fout.write(f'{args.title}\t{int(depth)}\t{len(y)}\t{mean_insize:5.1f}\t{med_insize:5.1f}\t{stddev:5.1f}\n')
+
 
 
 def main():
