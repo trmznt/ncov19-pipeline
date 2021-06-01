@@ -4,15 +4,15 @@ rule consensus_all:
        "maps/trimmed-depths.png"
        "cons/consensus.fa"
        "cons/variants.tsv"
-       "cons/blastn-consensus.txt" 
+       "cons/blastn-consensus.txt"
 
 
 rule plot_depths:
     input:
-        "maps/primers_trimmed.bam"
+        "maps/consensus.bam"
     output:
-        plotfile = "maps/trimmed-depths.png",
-        gapfile = "maps/trimmed-gaps.txt",
+        plotfile = "maps/consensus-depths.png",
+        gapfile = "maps/consensus-gaps.txt",
         depthfile = "maps/depth-counter.txt"
     shell:
         "{rootdir}/scripts/depthplot.py -t {sample_id} -d {min_depth} --stat_insert --outgap {output.gapfile} --outdepth {output.depthfile} -o {output.plotfile} {input}"
@@ -20,7 +20,7 @@ rule plot_depths:
 
 rule consensus:
     input:
-        "maps/primers_trimmed.bam"
+        "maps/consensus.bam"
     output:
         "cons/consensus.fa"
     log: "logs/ivar.log"
@@ -29,16 +29,25 @@ rule consensus:
 
 rule variants:
     input:
-        "maps/primers_trimmed.bam"
+        "maps/consensus.bam"
     output:
         "cons/variants.tsv"
     shell:
         "samtools mpileup -a -d 10000 -Q 0 {input} | ivar variants -p cons/variants -q 17 -t 0.5 -r {refseq} -g {gff}"
 
 
-rule blast_reporting:
+rule polish_consensus:
     input:
         "cons/consensus.fa"
+    output:
+        "cons/consensus.fas"
+    shell:
+        "{rootdir}/scripts/polish_consensus.py -l {sample_id} -o {output} {input}"
+
+
+rule blast_reporting:
+    input:
+        "cons/consensus.fas"
     output:
         "cons/blastn-consensus.txt"
     shell:
