@@ -30,8 +30,8 @@ def prep_directory(args):
             print('Error: unmatch pair [%s] - [%s]' % (prefix_1, prefix_2))
             sys.exit(1)
 
-        cmd1 = 'ln -sr %s %s/%s/reads/raw.R1.fastq.gz' % (infile_1, args.outdir, prefix_1)
-        cmd2 = 'ln -sr %s %s/%s/reads/raw.R2.fastq.gz' % (infile_2, args.outdir, prefix_2)
+        cmd1 = 'ln -s ../../../%s %s/%s/reads/raw.R1.fastq.gz' % (infile_1, args.outdir, prefix_1)
+        cmd2 = 'ln -s ../../../%s %s/%s/reads/raw.R2.fastq.gz' % (infile_2, args.outdir, prefix_2)
 
         os.makedirs('%s/%s/reads' % (args.outdir, prefix_1))
         os.makedirs('%s/%s/sanger' % (args.outdir,prefix_1))
