@@ -142,7 +142,7 @@ class PrimerLookup(object):
     def find_right_index(self, segment):
         """ find the last index of amplicon that can contain the segment """
         keys = self.right_keys[segment.reference_name]
-        return bisect.bisect_right(keys, segment.reference_end - 1)
+        return min(bisect.bisect_right(keys, segment.reference_end - 1), len(keys)-1)
 
 
 def softmask_primer(segment, primer_pos, end, debug):
@@ -350,10 +350,14 @@ def trim_ligation(read1, read2, primer_lookup, counter = {}):
 
         return False
 
-    softmask_primer(read1, le+1, False, False)
-    softmask_primer(read2, rs-1, True, False)
-    read1.set_tag('XP', l_idx + 1)
-    read2.set_tag('XP', l_idx + 1)
+    try:
+        softmask_primer(read1, le+1, False, False)
+        softmask_primer(read2, rs-1, True, False)
+        read1.set_tag('XP', l_idx + 1)
+        read2.set_tag('XP', l_idx + 1)
+    except RuntimeError as err:
+        cerr(f'<<< RuntimeError: {str(err)} >>>')
+        return None
 
     return True
 
@@ -459,10 +463,16 @@ def trim_primers(segments, primer_lookup, outfile, trimmer_func=None):
 
         try:
             res = trimmer_func(read1, read2, primer_lookup, amplicon_counter)
+
+        except RuntimeError as err:
+            cerr(f'<<< RuntimeError: {str(err)} >>>')
+            res = None
+
         except BaseException as inst:
             raise inst
             indel_pairs += 1
             continue
+
         if res is True:
             trimmed_pairs += 1
             #print(' 8< %s >8' % (read1.query_name))
