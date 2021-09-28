@@ -153,11 +153,15 @@ def depthplot( args ):
         y = y[ y > args.mindepth ]
         depth = y.mean() if len(y) > 0 else 0
         inserts_freqs = sum( inserts )[:len(insert_sizes)]
-        mean_insize = np.average(insert_sizes, weights = inserts_freqs)
-        cdf = np.cumsum(inserts_freqs[insert_sizes])
-        med_insize = np.searchsorted(cdf, cdf[-1] // 2)
-        dev = inserts_freqs * (insert_sizes - mean_insize) ** 2
-        stddev = np.sqrt( dev.sum() / (inserts_freqs.sum() - 1) )
+        if sum(inserts_freqs) == 0:
+            mean_insize = med_insize = stddev = 0
+        else:
+            mean_insize = np.average(insert_sizes, weights = inserts_freqs)
+            cdf = np.cumsum(inserts_freqs[insert_sizes])
+            med_insize = np.searchsorted(cdf, cdf[-1] // 2)
+            dev = inserts_freqs * (insert_sizes - mean_insize) ** 2
+            variance = dev.sum() / (inserts_freqs.sum() - 1)
+            stddev = np.sqrt(variance) if variance >= 0 else 0.0
         with open(args.outdepth, 'w') as fout:
             fout.write('SAMPLE\tDEPTH\tBASES\tMEAN_IS\tMED_IS\tSD_IS\n')
             fout.write(f'{args.title}\t{int(depth)}\t{len(y)}\t{mean_insize:5.1f}\t{med_insize:5.1f}\t{stddev:5.1f}\n')
