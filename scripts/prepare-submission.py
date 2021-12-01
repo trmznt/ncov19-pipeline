@@ -30,7 +30,10 @@ def prepare_submission(args):
     # open infile tsv
     cerr(f'[Reading infile {args.infile}]')
     submission_df = pd.read_table(args.infile, sep='\t')
-    submission_df['SAMPLE'] = submission_df['SAMPLE'].astype('str')
+
+    # check for available field in submission_df
+    code_field = 'SAMPLE' if 'SAMPLE' in submission_df.columns else 'fn'
+    submission_df[code_field] = submission_df[code_field].astype('str')
 
     # open sequence file
     cerr(f'[Reading sequence file {args.seqfile}]')
@@ -42,9 +45,10 @@ def prepare_submission(args):
     # iterate over submission_df
     used = []
     #import IPython; IPython.embed()
+
     for (i, s) in submission_df.iterrows():
 
-        sample_id = s['SAMPLE']
+        sample_id = s[code_field]
         r = metadata_df.loc[sample_id]
 
         if sample_id not in mseq_keys:
