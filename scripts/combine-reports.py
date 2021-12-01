@@ -7,8 +7,8 @@ import pandas as pd
 def parse_args():
     p = argparse.ArgumentParser(prog='combine-report.py')
     p.add_argument('-o', '--outfile', default='full-reports.csv')
-    p.add_argument('--outpass', default='submission-pass.tsv')
-    p.add_argument('--outfailed', default='submission-failed.tsv')
+    p.add_argument('--outpass', default='qc-pass.tsv')
+    p.add_argument('--outfailed', default='qc-failed.tsv')
     p.add_argument('-m', '--metafile')
     p.add_argument('-s', '--statfile', default='stats.tsv')
     p.add_argument('-l', '--lineagefile', default='lineage_report.csv')
@@ -27,7 +27,10 @@ def combine_report(args):
 
     df.to_csv(args.outfile, index=False, sep=',')
 
-    pass_filter = (df['N_BASE'] < 1000) & (df['LENGTH'] > 28000) & (df['ambiguity_score'] > 0.8)
+    # filtering criteria
+    # must have less than 1000 N and more than 28000 bp
+    # either have ambiguity_score > 0.8 or being predicted by PANGO
+    pass_filter = (df['N_BASE'] < 1000) & (df['LENGTH'] > 28000) & ((df['ambiguity_score'] > 0.8) | df['version'].str.startswith('PANGO'))
     df_pass = df[pass_filter]
     df_pass.to_csv(args.outpass, index=False, sep='\t')
     df_failed = df[~ pass_filter]
