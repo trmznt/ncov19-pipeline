@@ -27,6 +27,7 @@ def init_argparser():
     p.add_argument('--outgap', default='')
     p.add_argument('--outdepth', default='')
     p.add_argument('-o', '--outfile', default='outplot.png')
+    p.add_argument('--debug', default=False, action='store_true')
 
     p.add_argument('infile')
 
@@ -88,10 +89,11 @@ def depthplot( args ):
                 start_reads[read.query_name] = read.reference_start
 
     all_inserts = sum(inserts)
-    for max_insert_threshold in range(max_insert, 0, -1):
-        if all_inserts[max_insert_threshold] > 1:
-            break
-    max_insert = max_insert_threshold
+    if max_insert > 0:
+        for max_insert_threshold in range(max_insert, 0, -1):
+            if all_inserts[max_insert_threshold] > 1:
+                break
+        max_insert = max_insert_threshold
 
     if args.pool >= 0:
         analyzed_depths = [ depths[args.pool] ]
@@ -140,7 +142,10 @@ def depthplot( args ):
             insert_count = insert_count[:max_insert]
 
             # plot data
-            axs[1].hist(insert_sizes, len(insert_sizes), weights=insert_count, color=next(colors), alpha=0.5)
+            if max_insert == 0:
+                axs[1].plot([])
+            else:
+                axs[1].hist(insert_sizes, len(insert_sizes), weights=insert_count, color=next(colors), alpha=0.5)
             if args.log_insert:
                 axs[1].set_yscale("log", base=10)
             axs[1].set_title('Insert Size')
@@ -168,10 +173,19 @@ def depthplot( args ):
 
 
 
-def main():
-    depthplot( init_argparser().parse_args() )
+def main(args):
+    depthplot(args)
 
 
+# this script can be run independently or through seqpy spcli
 if __name__ == '__main__':
-    main()
+    args = init_argparser().parse_args()
+    if args.debug:
+        from ipdb import launch_ipdb_on_exception
+        with launch_ipdb_on_exception():
+            main(args)
+    else:
+        main(args)
+
+# EOF
 
