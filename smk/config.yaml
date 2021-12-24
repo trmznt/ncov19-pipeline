@@ -9,6 +9,12 @@ read_length: 150
 # libprep kit: Nextera Truseq UltraIIFS UltraII DNAPrep TruseqStranded
 libprep: Nextera
 
+# bedfile primer: 
+# nCov-2019-pr.bed (Artic V3)
+# neb_vss1a.primer-pr.bed (NEB VarSkip)
+
+bedfile: nCov-2019-pr.bed
+
 # do not change below unless you know exactly what you are doing
 minlen: 35
 maxlen: 0

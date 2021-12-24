@@ -9,6 +9,7 @@ except KeyError:
 refseq = rootdir + "/ref/nc_045512.fasta"
 refmap = rootdir + "/ref/nc_045512.mmi"
 gff = rootdir + "/ref/NC_045512.2.sorted.gff3"
+bedfile = rootdir + "/ref/" + config['bedfile']
 sample_id = os.path.basename( os.getcwd() )
 mode = 'tagment' if config['libprep'].lower() in ['nextera', 'ultraiifs', 'dnaprep', 'truseqstranded'] else 'ligate'
 
@@ -128,7 +129,7 @@ elif config['primer_trimmer'].lower() == 'primal_remover':
             "maps/consensus.bam",
         log: "logs/primal_remover.log"
         shell:
-            "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {rootdir}/ref/nCoV-2019-pr.bed --logfile {log}  -o - {input}"
+            "{rootdir}/scripts/primal_remover.py -m {mode} --bedfile {bedfile} --logfile {log}  -o - {input}"
             " | samtools fixmate -m - - | samtools sort -@8 -o {output} -"
 
 
