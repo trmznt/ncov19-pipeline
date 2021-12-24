@@ -70,10 +70,15 @@ def depthplot( args ):
                 pool = amp_id % 2
         except KeyError:
             pool = 2
-        depths[pool][read.reference_start : read.reference_end] += 1
+        # sanity check
+        if read.reference_end is None:
+            reference_end = read.get_reference_positions()[-1]
+        else:
+            reference_end = read.reference_end
+        depths[pool][read.reference_start : reference_end] += 1
         if read.query_name in start_reads:
             if read.is_reverse:
-                insert_size = read.reference_end - start_reads[read.query_name]
+                insert_size = reference_end - start_reads[read.query_name]
             else:
                 insert_size = start_reads[read.query_name] - read.reference_start
             del start_reads[read.query_name]
@@ -84,7 +89,7 @@ def depthplot( args ):
                 print('WARN: impossible insert size of %d' % insert_size)
         else:
             if read.is_reverse:
-                start_reads[read.query_name] = read.reference_end
+                start_reads[read.query_name] = reference_end
             else:
                 start_reads[read.query_name] = read.reference_start
 
