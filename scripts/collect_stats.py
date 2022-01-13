@@ -111,28 +111,55 @@ def main():
 
     sample_code = sys.argv[1]
     #report_file = sys.argv[2]
+    
+    filelist = ['logs/optical_dedup.log', 
+                'logs/adapter_trimming.log',
+                'logs/unique_pairs.log', 
+                'logs/markdup.log',
+                'logs/primal_remover.log']
+    
+    if all([os.path.isfile(f) for f in filelist]):
+        initial_reads, optical_dedup_reads = parse_optical_dedup()
+        adapter_trimmed_reads = parse_adapter_trimming()
+        properly_mapped_reads = parse_unique_pairs()
+        
+        try:
+            pcr_dedup_reads = parse_markdup()
+        except:
+            # pcr dedup is not performed
+            pcr_dedup_reads = properly_mapped_reads
 
-    initial_reads, optical_dedup_reads = parse_optical_dedup()
-    adapter_trimmed_reads = parse_adapter_trimming()
-    properly_mapped_reads = parse_unique_pairs()
-
-    try:
-        pcr_dedup_reads = parse_markdup()
-    except:
-        # pcr dedup is not performed
-        pcr_dedup_reads = properly_mapped_reads
-
-    try:
-        primer_trimmed_reads = parse_primal_remover()
-    except FileNotFoundError:
-        # primer trimming is not performed
-        primer_trimmed_reads = pcr_dedup_reads
-
+        try:
+            primer_trimmed_reads = parse_primal_remover()
+        except FileNotFoundError:
+            # primer trimming is not performed
+            primer_trimmed_reads = pcr_dedup_reads
+           
+    else:
+        initial_reads = 0
+        optical_dedup_reads = 0
+        adapter_trimmed_reads = 0
+        properly_mapped_reads = 0
+        pcr_dedup_reads = 0
+        primer_trimmed_reads = 0
+    
     depth, bases, mean_is, med_is, sd_is = parse_depth_counter()
     seqlength, n_bases = parse_consensus_fasta()
     point_mutations, inframe_gaps, ooframe_gaps = parse_variants()
 
-
+    try:
+        op_dedup_r = optical_dedup_reads/initial_reads
+        adapter_r = adapter_trimmed_reads/initial_reads
+        prop_pair_r = properly_mapped_reads/initial_reads
+        pcr_dedup_r = pcr_dedup_reads/initial_reads
+        primal_r = primer_trimmed_reads/initial_reads
+    except ZeroDivisionError:
+        op_dedup_r = 0
+        adapter_r = 0
+        prop_pair_r = 0
+        pcr_dedup_r = 0
+        primal_r = 0
+   
     # writing report
 
     #outfile = open(report_file, 'w')
@@ -144,16 +171,16 @@ def main():
     outfile.write('%s\n' % '\t'.join( headers ))
     outfile.write(  f'{sample_code}\t'
                     f'{initial_reads}\t'
-                    f'{optical_dedup_reads}\t{optical_dedup_reads/initial_reads:5.3f}\t'
-                    f'{adapter_trimmed_reads}\t{adapter_trimmed_reads/initial_reads:5.3f}\t'
-                    f'{properly_mapped_reads}\t{properly_mapped_reads/initial_reads:5.3f}\t'
-                    f'{pcr_dedup_reads}\t{pcr_dedup_reads/initial_reads:5.3f}\t'
-                    f'{primer_trimmed_reads}\t{primer_trimmed_reads/initial_reads:5.3f}\t'
+                    f'{optical_dedup_reads}\t{op_dedup_r:5.3f}\t'
+                    f'{adapter_trimmed_reads}\t{adapter_r:5.3f}\t'
+                    f'{properly_mapped_reads}\t{prop_pair_r:5.3f}\t'
+                    f'{pcr_dedup_reads}\t{pcr_dedup_r:5.3f}\t'
+                    f'{primer_trimmed_reads}\t{primal_r:5.3f}\t'
                     f'{mean_is}\t{med_is}\t{sd_is}\t'
                     f'{depth}\t{bases}\t{seqlength}\t{n_bases}\t'
                     f'{point_mutations}\t{inframe_gaps}\t{ooframe_gaps}\n'
-    )
-
+    )   
+        
 if __name__ == '__main__':
     main()
 
